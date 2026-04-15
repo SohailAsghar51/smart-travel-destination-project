@@ -1,0 +1,277 @@
+.App {
+  text-align: center;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+/* New app styles */
+.App-container {
+  max-width: 1100px;
+  margin: 24px auto;
+  padding: 16px;
+}
+
+.App-title {
+  font-size: 28px;
+  margin-bottom: 12px;
+}
+
+.search-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.search-input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+.search-btn {
+  background: #1976d2;
+  color: white;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.App-row {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.App-main { flex: 1; }
+.App-aside { width: 300px; }
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  overflow: hidden;
+  text-align: left;
+}
+
+.card-image {
+  height: 140px;
+  background-size: cover;
+  background-position: center;
+}
+
+.card-body { padding: 12px; }
+.card-title { margin: 0 0 4px 0; }
+.card-region { margin: 0 0 8px 0; color: #555; }
+.card-price { margin: 0 0 8px 0; font-weight: 600; }
+.card-tags { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+.tag { background:#eef6ff; padding:4px 8px; border-radius:12px; font-size:12px; }
+.card-actions { display:flex; gap:8px; }
+.btn { background:#1976d2; color:white; border:none; padding:8px 10px; border-radius:6px; cursor:pointer }
+.btn-outline { background:transparent; border:1px solid #1976d2; color:#1976d2; padding:8px 10px; border-radius:6px; cursor:pointer }
+
+.btn.saved { background: linear-gradient(90deg,#0b3d91,#1976d2); color:#fff; border:none }
+
+.suggestions { background:#fff; padding:12px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.06); margin-bottom:16px }
+.suggestion-item { margin-bottom:12px }
+.muted { color:#666; font-size:13px }
+
+.guest-box { background:#fff; padding:12px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.06) }
+.guest-actions { display:flex; gap:8px; margin-top:8px }
+
+@media (max-width: 900px) {
+  .App-row { flex-direction: column; }
+  .App-aside { width: 100%; }
+}
+
+/* Navbar styles */
+.site-nav {
+  width: 100%;
+  background: linear-gradient(90deg, #0f172a, #0b3d91);
+  color: white;
+  box-shadow: 0 2px 10px rgba(2,6,23,0.2);
+}
+.nav-inner { max-width:1100px; margin: 0 auto; display:flex; align-items:center; gap:16px; padding:12px 16px; }
+.brand { font-weight:700; font-size:18px; }
+.nav-links { display:flex; gap:14px; margin-left:8px; flex:1 }
+.nav-links a { color: rgba(255,255,255,0.85); text-decoration:none; padding:6px 10px; border-radius:6px }
+.nav-links a.active, .nav-links a:hover { background: rgba(255,255,255,0.06); color: #fff }
+.nav-actions { display:flex; gap:8px }
+.btn.small { padding:6px 8px; font-size:13px }
+
+.page { padding: 8px 0 24px 0 }
+.page-header { margin-bottom: 18px }
+.lead { color: #4b5563 }
+
+/* Auth pages */
+.page-auth { max-width:520px; margin: 24px auto; padding: 18px; background:#fff; border-radius:8px }
+.auth-form { display:flex; flex-direction:column; gap:8px }
+.auth-form input { padding:8px 10px; border-radius:6px; border:1px solid #e5e7eb }
+.error { color: #b91c1c }
+
+.page-profile .profile-grid { display:flex; gap:20px }
+.profile-form { background:#fff; padding:16px; border-radius:8px; width:360px }
+.profile-recs { flex:1 }
+
+/* Cost summary */
+.cost-summary { background:#fff; padding:12px; border-radius:8px; box-shadow:0 6px 18px rgba(2,6,23,0.04); margin-top:12px }
+.cost-summary table { width:100%; border-collapse:collapse }
+.cost-summary td { padding:6px 8px }
+.cost-summary .total td { font-weight:700; border-top:1px solid #eee }
+
+/* Admin page */
+.page-admin textarea { font-family: monospace; font-size:13px }
+
+/* Trip details page */
+.page-trip .trip-header { display:flex; gap:16px; align-items:center; margin-bottom:16px }
+.trip-image { width:260px; height:160px; background-size:cover; background-position:center; border-radius:8px }
+.trip-meta h1 { margin:0 }
+.trip-body { display:flex; gap:20px }
+.trip-left { flex:1; background:#fff; padding:12px; border-radius:8px }
+.trip-right { width:340px }
+.itinerary { margin-top:8px }
+.it-day { padding:8px 0; border-bottom:1px dashed #eee }
+
+@media (max-width:900px) {
+  .trip-body { flex-direction:column }
+  .trip-right { width:100% }
+}
+
+
+
+
+/* Improve cards look for modern feel */
+.card { transition: transform .18s ease, box-shadow .18s ease }
+.card:hover { transform: translateY(-6px); box-shadow: 0 10px 30px rgba(2,6,23,0.12) }
+
+/* Filters and explore layout */
+.layout-two-col { display:flex; gap:20px; align-items:flex-start }
+.explore-left { width: 280px }
+.explore-right { flex:1 }
+.filters { position: relative }
+.filters-panel { background: #fff; padding: 16px; border-radius: 10px; box-shadow: 0 6px 18px rgba(2,6,23,0.06) }
+.filter-list { display:flex; flex-direction:column; gap:8px; margin-top:8px }
+
+.slider-wrap { display:flex; flex-direction:column; gap:8px }
+.range-slider { width:100%; }
+.slider-value { font-size:13px; color:#374151 }
+
+/* Hero specific styles */
+.hero { background: linear-gradient(180deg,#f1f8ff, #ffffff); padding: 48px 0; border-radius: 8px; margin-bottom: 18px }
+.hero-inner { max-width: 1100px; margin: 0 auto; padding: 12px }
+.hero-top { background:#e6f0ff; display:inline-block; padding:6px 12px; border-radius:20px; color:#0b3d91; margin-bottom:12px }
+.hero-title { font-size:36px; margin:8px 0 }
+.hero-sub { color:#6b7280; margin-bottom:18px }
+.search-bar-hero { display:flex; gap:12px; align-items:center; justify-content:space-between }
+.search-left { display:flex; gap:8px; flex:1 }
+.search-input-hero { flex:1; padding:14px 16px; border-radius:10px; border:1px solid #e5e7eb }
+.search-btn-hero { background:#0b3d91; color:#fff; border:none; padding:12px 18px; border-radius:10px }
+.search-actions .filters-btn { background:#fff; border:1px solid #e5e7eb; padding:10px 12px; border-radius:10px }
+
+.hero-chips { display:flex; gap:8px; margin-top:12px }
+.chip { background:#fff; border:1px solid #e6eefc; padding:8px 12px; border-radius:999px; cursor:pointer }
+
+/* Explore header and banner */
+.explore-header { margin-bottom:12px }
+.ai-banner { background:#eef6ff; padding:10px 12px; border-radius:10px; color:#0b3d91; display:inline-block; margin-bottom:8px }
+
+@media (max-width:900px) {
+  .layout-two-col { flex-direction: column }
+  .explore-left { width:100% }
+}
+
+/* Hero */
+.hero { background: linear-gradient(180deg,#f5f9ff 0%, #ffffff 60%); padding: 48px 0; }
+.hero-inner { max-width:1100px; margin: 0 auto; text-align:center; }
+.hero-top { background:#e8f0ff; display:inline-block; color:#0b3d91; padding:6px 12px; border-radius:20px; margin-bottom:12px; font-size:13px }
+.hero-title { font-size:34px; margin:8px 0 8px; color:#0b2140 }
+.hero-sub { color:#556070; margin-bottom:16px }
+.search-bar-hero { display:flex; justify-content:center; gap:12px; align-items:center; margin: 12px 0 8px }
+.search-left { display:flex; gap:8px; width:70%; max-width:760px }
+.search-input-hero { flex:1; padding:14px 16px; border-radius:10px; border:1px solid #e6eefc; box-shadow: inset 0 1px 0 rgba(255,255,255,0.6); font-size:15px }
+.search-btn-hero { background:#0b2140; color:white; border:none; padding:12px 18px; border-radius:10px; cursor:pointer }
+.search-actions .filters-btn { background:transparent; border:1px solid #e6eefc; padding:8px 12px; border-radius:10px }
+.hero-chips { display:flex; gap:8px; justify-content:center; margin-top:12px }
+.chip { background:#fff; border:1px solid #eef4ff; padding:8px 10px; border-radius:999px; font-size:13px }
+
+/* summary cards under hero */
+.summary-row { max-width:1100px; margin:16px auto; display:flex; gap:16px }
+.summary-card { background:#fff; padding:18px; border-radius:10px; box-shadow:0 6px 18px rgba(15,23,42,0.05); flex:1 }
+.kicker { color:#6b7280; font-size:13px }
+
+/* Featured */
+.featured { max-width:1100px; margin:20px auto }
+.section-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px }
+.featured-grid { grid-template-columns: repeat(3, 1fr); }
+
+/* Featured card styles */
+.featured-card { border-radius:12px; overflow:hidden; background:#fff }
+.card-hero { height:180px; background-size:cover; background-position:center; position:relative }
+.rating-badge { position:absolute; top:12px; right:12px; background:linear-gradient(90deg,#ffd166,#ffb703); padding:6px 8px; border-radius:8px; font-weight:700 }
+.card-body { padding:14px }
+.card-row { display:flex; justify-content:space-between; align-items:flex-start; gap:12px }
+.card-title { margin:0; font-size:18px }
+.card-sub { color:#6b7280; font-size:13px }
+.price-block { text-align:right }
+.price { color:#047857; font-weight:700 }
+.per { color:#6b7280; font-size:12px }
+.card-summary { color:#374151; margin:10px 0 }
+.card-tags { display:flex; gap:8px; flex-wrap:wrap }
+.tag { background:#f3f6fb; padding:6px 10px; border-radius:999px; font-size:12px; color:#0b2140 }
+.card-actions .btn.full { width:100%; background:#0b2140; color:white; border-radius:8px; padding:10px; border:none }
+
+/* Explore layout */
+.layout-explore { display:flex; gap:20px; max-width:1200px; margin: 18px auto }
+.explore-left { width:280px }
+.filters { position:sticky; top:80px }
+.explore-main { flex:1 }
+.ai-banner { background:#eef7ff; padding:12px; border-radius:10px; color:#0b2140; margin-bottom:12px }
+.explore-grid { grid-template-columns: repeat(2, 1fr); }
+
+@media (max-width: 920px) {
+  .featured-grid { grid-template-columns: 1fr }
+  .explore-grid { grid-template-columns: 1fr }
+  .summary-row { flex-direction: column }
+  .search-left { width:100% }
+}
+
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
