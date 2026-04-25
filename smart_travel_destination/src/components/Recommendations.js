@@ -1,6 +1,7 @@
+// Small list of “for you” places (the server scores destinations from the user profile).
 import React, { useEffect, useState } from 'react';
 import DestinationCard from './DestinationCard';
-import { getApiBase } from '../api/client';
+import { apiUrl } from '../api/client';
 
 export default function Recommendations({ userId, userProfile }) {
   const [list, setList] = useState([]);
@@ -8,7 +9,7 @@ export default function Recommendations({ userId, userProfile }) {
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
-    fetch(`${getApiBase()}/api/recommendations/${userId}`)
+    fetch(apiUrl(`/api/recommendations/${userId}`))
       .then((r) => r.json())
       .then((data) => {
         if (cancelled || !data.items) return;

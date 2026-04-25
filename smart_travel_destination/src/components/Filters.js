@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getApiBase } from '../api/client';
+import { apiUrl } from '../api/client';
 
 /** Human-readable label; DB stores lowercase (e.g. cultural → Cultural, hill station → Hill Station). */
 export function formatCategoryLabel(slug) {
@@ -15,7 +15,6 @@ const DEFAULT_BUDGET_MAX = 50000;
 
 export default function Filters({
   initialBudget = DEFAULT_BUDGET_MAX,
-  onBudgetChange,
   onClear,
   onFilterChange,
 }) {
@@ -25,10 +24,11 @@ export default function Filters({
   const [catLoading, setCatLoading] = useState(true);
   const [catError, setCatError] = useState('');
 
+  // Load category names from the database once (same list the server uses for filters)
   useEffect(() => {
     setCatLoading(true);
     setCatError('');
-    fetch(`${getApiBase()}/api/destination-categories`)
+    fetch(apiUrl('/api/destination-categories'))
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         const list = Array.isArray(data?.categories) ? data.categories : [];
@@ -41,10 +41,7 @@ export default function Filters({
       .finally(() => setCatLoading(false));
   }, []);
 
-  useEffect(() => {
-    if (onBudgetChange) onBudgetChange(budget);
-  }, [budget, onBudgetChange]);
-
+  // Tell the Explore page when budget or categories change (one update, no infinite loop)
   useEffect(() => {
     if (onFilterChange) onFilterChange({ budget, styles: selectedCategories });
   }, [budget, selectedCategories, onFilterChange]);

@@ -1,12 +1,13 @@
+// Main home view: search, featured places, and weather (data comes from /api/home/).
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SearchBar from '../components/SearchBar';
 import DestinationCard from '../components/DestinationCard';
 import { useAuth } from '../context/AuthContext';
-import { getApiBase } from '../api/client';
+import { apiUrl } from '../api/client';
 
 export default function HomePage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [home, setHome] = useState(null);
   const [searchResults, setSearchResults] = useState([]);
@@ -16,8 +17,9 @@ export default function HomePage() {
 
   useEffect(() => {
     let cancelled = false;
+    // Add user on the query string if logged in, so the server can personalize the home data
     const q = user && user.id ? `?user_id=${user.id}` : '';
-    fetch(`${getApiBase()}/api/home${q}`)
+    fetch(`${apiUrl('/api/home')}${q}`)
       .then((r) => r.json())
       .then((data) => {
         if (!cancelled) setHome(data);
@@ -31,12 +33,11 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [user?.id, profile?.budget, profile?.styles, profile?.duration]);
 
   function handleSearch(q) {
     setSearchLoading(true);
-    fetch(`${getApiBase()}/api/search`, {
+    fetch(apiUrl('/api/search'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: q, user_id: user ? user.id : null }),
@@ -154,7 +155,15 @@ export default function HomePage() {
 
       <section className="featured">
         <div className="section-head">
-          <h2>Featured Destinations</h2>
+          <div>
+            <h2>{home?.featured_personalized ? 'Picked for you' : 'Featured Destinations'}</h2>
+            {home?.featured_personalized && (home.preference_categories || []).length > 0 && (
+              <p className="muted small" style={{ margin: '6px 0 0' }}>
+                Based on your saved categories: {(home.preference_categories || []).join(', ')}.
+                Edit them anytime on your profile.
+              </p>
+            )}
+          </div>
           <button type="button" className="btn-outline small" onClick={() => navigate('/explore')}>
             View All
           </button>

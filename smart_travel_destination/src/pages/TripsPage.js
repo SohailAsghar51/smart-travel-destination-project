@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import DestinationCard from '../components/DestinationCard';
 import { useNavigate, Link } from 'react-router-dom';
-import { getApiBase } from '../api/client';
+import { apiUrl } from '../api/client';
 
 const DEFAULT_TRIP_THUMB =
   'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=400&q=60';
@@ -20,12 +20,11 @@ export default function TripsPage() {
       setTrips([]);
       return;
     }
-    const base = getApiBase();
-    fetch(`${base}/api/favorites/${userId}`)
+    fetch(apiUrl(`/api/favorites/${userId}`))
       .then((r) => r.json())
       .then((data) => setSavedDestinations(data.favorites || []))
       .catch(() => setSavedDestinations([]));
-    fetch(`${base}/api/trips?user_id=${userId}`)
+    fetch(`${apiUrl('/api/trips')}?user_id=${userId}`)
       .then((r) => r.json())
       .then((data) => setTrips(data.trips || []))
       .catch(() => setTrips([]));

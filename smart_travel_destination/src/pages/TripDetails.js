@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import CostSummary from '../components/CostSummary';
 import { useAuth } from '../context/AuthContext';
-import { getApiBase } from '../api/client';
+import { apiUrl } from '../api/client';
 
 function parseIntParam(n, def, min, max) {
   const v = Number(n);
@@ -58,7 +58,7 @@ export default function TripDetails() {
   }, [destIdNum]);
 
   useEffect(() => {
-    fetch(`${getApiBase()}/api/destinations/${id}`)
+    fetch(apiUrl(`/api/destinations/${id}`))
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => setDest(d))
       .catch(() => setDest(null));
@@ -92,7 +92,7 @@ export default function TripDetails() {
     }
     const ac = new AbortController();
     setLiveWeatherNote('Loading current weather…');
-    fetch(`${getApiBase()}/api/weather?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`, {
+    fetch(`${apiUrl('/api/weather')}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`, {
       signal: ac.signal,
     })
       .then(async (r) => {
@@ -145,7 +145,7 @@ export default function TripDetails() {
           : null;
     const user_message = [notesDebounced.trim(), autoHint].filter(Boolean).join('. ');
 
-    fetch(`${getApiBase()}/api/trips/preview`, {
+    fetch(apiUrl('/api/trips/preview'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -235,7 +235,7 @@ export default function TripDetails() {
       .join('; ');
     const user_message = [planNotes.trim(), autoHintLocal].filter(Boolean).join('. ');
     setSaveStatus('Saving…');
-    fetch(`${getApiBase()}/api/trips/plan`, {
+    fetch(apiUrl('/api/trips/plan'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

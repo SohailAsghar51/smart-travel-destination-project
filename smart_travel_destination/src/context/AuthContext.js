@@ -1,5 +1,6 @@
+// Login state for the whole app (user, profile, saved trips). Any page can read it with useAuth().
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { getApiBase } from '../api/client';
+import { apiUrl } from '../api/client';
 
 const AuthContext = createContext(null);
 
@@ -30,8 +31,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!user || !user.id) return undefined;
     let cancelled = false;
-    const base = getApiBase();
-    fetch(`${base}/api/favorites/${user.id}`)
+    fetch(apiUrl(`/api/favorites/${user.id}`))
       .then((r) => r.json())
       .then((data) => {
         if (cancelled || !data.favorites) return;
@@ -54,8 +54,7 @@ export function AuthProvider({ children }) {
   }
 
   async function register({ email, name, password }) {
-    const base = getApiBase();
-    const res = await fetch(`${base}/api/register`, {
+    const res = await fetch(apiUrl('/api/register'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, email, password }),
@@ -94,14 +93,13 @@ export function AuthProvider({ children }) {
 
   async function updateProfile(patch) {
     if (!user || !user.id) return;
-    const base = getApiBase();
     const body = {
       budget: patch.budget,
       styles: patch.styles,
       duration: patch.duration,
       typical_trip_duration_days: patch.duration,
     };
-    const res = await fetch(`${base}/api/profile/${user.id}`, {
+    const res = await fetch(apiUrl(`/api/profile/${user.id}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -125,8 +123,7 @@ export function AuthProvider({ children }) {
     if (!user || !user.id) {
       return null;
     }
-    const base = getApiBase();
-    const res = await fetch(`${base}/api/favorites`, {
+    const res = await fetch(apiUrl('/api/favorites'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -381,7 +381,8 @@
 
 /* Featured */
 .featured { max-width:1100px; margin:20px auto }
-.section-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px }
+.section-head { display:flex; align-items:flex-start; justify-content:space-between; gap: 12px; margin-bottom:12px; flex-wrap:wrap }
+.section-head h2 { margin: 0; }
 .featured-grid { grid-template-columns: repeat(3, 1fr); }
 
 /* Featured card styles */

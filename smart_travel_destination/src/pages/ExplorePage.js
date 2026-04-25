@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import DestinationCard from '../components/DestinationCard';
 import Filters from '../components/Filters';
 import SearchBar from '../components/SearchBar';
-import { getApiBase } from '../api/client';
+import { apiUrl } from '../api/client';
 
 export default function ExplorePage() {
   const [budget, setBudget] = useState(50000);
@@ -13,7 +13,8 @@ export default function ExplorePage() {
   const [searchExtract, setSearchExtract] = useState(null);
 
   useEffect(() => {
-    fetch(`${getApiBase()}/api/destinations?limit=200`)
+    // Load many destinations once; we filter in the browser (search + sliders)
+    fetch(`${apiUrl('/api/destinations')}?limit=200`)
       .then((r) => r.json())
       .then((data) => {
         setAllDest(data);
@@ -25,7 +26,7 @@ export default function ExplorePage() {
       });
   }, []);
 
-  /** Selected values are lowercase `destinations.category` strings from GET /api/destination-categories */
+  /** Each checkbox value is a lowercase category from the API list */
   function matchesDbCategories(dest, selected) {
     if (!selected || selected.length === 0) return true;
     const raw = (dest.category || '').toLowerCase().trim();
@@ -44,75 +45,78 @@ export default function ExplorePage() {
     });
   }
 
-  function applyFilters(q, b, s) {
-    const t = q ? q.toLowerCase() : '';
-    const filtered = allDest.filter((d) => {
+  const applyFilters = useCallback(
+    (q, b, s) => {
+      const t = q ? q.toLowerCase() : '';
+      const filtered = allDest.filter((d) => {
         const matchesText =
-        !t ||
-        d.name.toLowerCase().includes(t) ||
-        (d.region && d.region.toLowerCase().includes(t)) ||
-        (d.category && d.category.toLowerCase().includes(t)) ||
-        (d.tags && d.tags.join(' ').toLowerCase().includes(t));
-      const perDay = d.priceFrom != null ? d.priceFrom : d.cost;
-      const matchesBudget = typeof b === 'number' ? perDay != null && perDay <= b : true;
-      const matchesCat = matchesDbCategories(d, s);
-      return matchesText && matchesBudget && matchesCat;
-    });
-    setResults(filtered);
-  }
+          !t ||
+          d.name.toLowerCase().includes(t) ||
+          (d.region && d.region.toLowerCase().includes(t)) ||
+          (d.category && d.category.toLowerCase().includes(t)) ||
+          (d.tags && d.tags.join(' ').toLowerCase().includes(t));
+        const perDay = d.priceFrom != null ? d.priceFrom : d.cost;
+        const matchesBudget = typeof b === 'number' ? perDay != null && perDay <= b : true;
+        const matchesCat = matchesDbCategories(d, s);
+        return matchesText && matchesBudget && matchesCat;
+      });
+      setResults(filtered);
+    },
+    [allDest]
+  );
 
-  function handleBudgetChange(b) {
-    setBudget(b);
-    applyFilters(searchText, b, styles);
-  }
-
-  function handleSearch(q) {
-    setSearchText(q);
-    applyFilters(q, budget, styles);
-    if (q && q.length >= 2) {
-      fetch(`${getApiBase()}/api/nlp/parse`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q }),
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.extracted) {
-            setSearchExtract(data.extracted);
-            try {
-              const ex = data.extracted;
-              if (ex.duration_days != null || ex.budget_pkr != null) {
-                sessionStorage.setItem(
-                  'st_search_query_plan',
-                  JSON.stringify({
-                    days: ex.duration_days > 0 ? ex.duration_days : 3,
-                    totalBudgetPkr: ex.budget_pkr != null ? ex.budget_pkr : null,
-                  })
-                );
-              }
-            } catch (e) {
-              // ignore
-            }
-          }
+  const handleSearch = useCallback(
+    (q) => {
+      setSearchText(q);
+      applyFilters(q, budget, styles);
+      if (q && q.length >= 2) {
+        fetch(apiUrl('/api/nlp/parse'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: q }),
         })
-        .catch(() => setSearchExtract(null));
-    } else {
-      setSearchExtract(null);
-    }
-  }
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.extracted) {
+              setSearchExtract(data.extracted);
+              try {
+                const ex = data.extracted;
+                if (ex.duration_days != null || ex.budget_pkr != null) {
+                  sessionStorage.setItem(
+                    'st_search_query_plan',
+                    JSON.stringify({
+                      days: ex.duration_days > 0 ? ex.duration_days : 3,
+                      totalBudgetPkr: ex.budget_pkr != null ? ex.budget_pkr : null,
+                    })
+                  );
+                }
+              } catch (e) {
+                // ignore
+              }
+            }
+          })
+          .catch(() => setSearchExtract(null));
+      } else {
+        setSearchExtract(null);
+      }
+    },
+    [applyFilters, budget, styles]
+  );
 
-  function handleFilterChange({ budget: b, styles: s }) {
-    if (typeof b !== 'undefined') setBudget(b);
-    setStyles(s || []);
-    applyFilters(searchText, typeof b !== 'undefined' ? b : budget, s || []);
-  }
+  const handleFilterChange = useCallback(
+    ({ budget: b, styles: s }) => {
+      if (typeof b !== 'undefined') setBudget(b);
+      setStyles(s || []);
+      applyFilters(searchText, typeof b !== 'undefined' ? b : budget, s || []);
+    },
+    [applyFilters, searchText, budget]
+  );
 
   return (
     <div className="page page-explore layout-two-col">
       <div className="explore-left">
         <Filters
           initialBudget={budget}
-          onBudgetChange={handleBudgetChange}
           onFilterChange={handleFilterChange}
           onClear={() => {
             setResults(allDest);

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getApiBase } from '../api/client';
+import { apiUrl } from '../api/client';
 
 const SAVED_TRIP_HERO_FALLBACK =
   'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=60';
@@ -28,7 +28,7 @@ export default function SavedTripPage() {
     const ac = new AbortController();
     setError('');
     setLoading(true);
-    fetch(`${getApiBase()}/api/trips/${tripId}?user_id=${user.id}`, { signal: ac.signal })
+    fetch(`${apiUrl(`/api/trips/${tripId}`)}?user_id=${user.id}`, { signal: ac.signal })
       .then(async (r) => {
         const j = await r.json();
         if (r.status === 404) {

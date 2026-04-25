@@ -1,27 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Recommendations from '../components/Recommendations';
+import { formatCategoryLabel } from '../components/Filters';
+import { apiUrl } from '../api/client';
 
 export default function ProfilePage() {
   const { user, logout, updateProfile, profile: ctxProfile } = useAuth();
   const [profile, setProfile] = useState({
     budget: 25000,
-    styles: ['Nature'],
+    styles: [],
     duration: 3,
   });
+  const [dbCategories, setDbCategories] = useState([]);
+  const [catLoading, setCatLoading] = useState(true);
+
+  // Ask the server for all category names that exist in the database (for checkboxes)
+  useEffect(() => {
+    setCatLoading(true);
+    fetch(apiUrl('/api/destination-categories'))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const list = Array.isArray(data?.categories) ? data.categories : [];
+        setDbCategories(list);
+      })
+      .catch(() => setDbCategories([]))
+      .finally(() => setCatLoading(false));
+  }, []);
 
   useEffect(() => {
     const p = (user && user.profile) || ctxProfile;
     if (p) {
+      const norm = (p.styles || []).map((x) => String(x).trim().toLowerCase()).filter(Boolean);
       setProfile({
         budget: p.budget != null ? p.budget : 25000,
-        styles: p.styles && p.styles.length ? p.styles : ['Nature'],
+        styles: norm,
         duration: p.duration != null ? p.duration : 3,
       });
     }
   }, [user, ctxProfile]);
 
-  function toggleStyle(s) {
+  function toggleStyle(slug) {
+    const s = String(slug).toLowerCase();
     const next = profile.styles.includes(s) ? profile.styles.filter((x) => x !== s) : [...profile.styles, s];
     setProfile({ ...profile, styles: next });
   }
@@ -60,11 +79,23 @@ export default function ProfilePage() {
           />
           <div className="muted">Up to {profile.budget.toLocaleString()} PKR</div>
 
-          <h4 style={{ marginTop: 12 }}>Travel Styles</h4>
+          <h4 style={{ marginTop: 12 }}>Preference categories</h4>
+          <p className="muted small" style={{ margin: '0 0 8px' }}>
+            Same categories as destination filters in Explore — from your live database.
+          </p>
+          {catLoading && <p className="muted">Loading categories…</p>}
+          {!catLoading && dbCategories.length === 0 && (
+            <p className="muted">No categories found. Add destination rows with categories, then save again.</p>
+          )}
           <div className="filter-list">
-            {['Adventure', 'Relaxation', 'Family', 'City', 'Nature'].map((s) => (
-              <label key={s}>
-                <input type="checkbox" checked={profile.styles.includes(s)} onChange={() => toggleStyle(s)} /> {s}
+            {dbCategories.map((slug) => (
+              <label key={slug}>
+                <input
+                  type="checkbox"
+                  checked={profile.styles.includes(slug)}
+                  onChange={() => toggleStyle(slug)}
+                />{' '}
+                {formatCategoryLabel(slug)}
               </label>
             ))}
           </div>

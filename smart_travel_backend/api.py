@@ -1,49 +1,74 @@
+"""
+Smart Travel — Flask HTTP API (this file).
+
+- We define each URL (for example /api/home/) and what it returns (JSON).
+- Big jobs are in other folders: db/ (database), clients/ (AI + weather), etc.
+- Run:  python api.py   (from the smart_travel_backend folder)
+"""
+
 import os
+import sys
+from pathlib import Path
+
+# So `import db` / `clients` resolve when the app is not launched with cwd = this folder
+# (e.g. IDE "Run" from repo root, or `python path/to/api.py`).
+_BACKEND_ROOT = Path(__file__).resolve().parent
+_root = str(_BACKEND_ROOT)
+if _root not in sys.path:
+    sys.path.insert(0, _root)
 
 import requests
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from werkzeug.security import check_password_hash
 
-import database_functions as db
-import recommendation_logic
+import db.repository as db
 from config import (
     GOOGLE_MAPS_API_KEY,
     GROQ_API_KEY,
     GROQ_MODEL,
     RAPIDAPI_KEY,
 )
-from weather_rapidapi import fetch_weather_latlon
-from maps_util import (
-    collect_itinerary_map_points,
-    destination_hero_image_url,
-    itinerary_map_image_url,
-)
-from weather_rapidapi import fetch_weather_latlon, format_weather_context_for_groq
-from groq_client import (
+from clients.weather import fetch_weather_latlon, format_weather_context_for_groq
+from clients.groq import (
     build_itinerary_from_places_with_groq,
     build_itinerary_with_groq,
     parse_travel_nlp,
     sum_itinerary_cost_pkr,
 )
-from search_helpers import select_destinations_for_search
+from maps.static_maps import (
+    collect_itinerary_map_points,
+    destination_hero_image_url,
+    itinerary_map_image_url,
+)
+from recommendations import run_recommendation
+from search.helpers import select_destinations_for_search
 
 app = Flask(__name__)
-CORS(app)
+# CORS: flask-cors 4 may respond 403 for requests whose Origin is not allowlisted (browser then shows
+# "blocked by CORS" with no header). Use * by default in dev; set CORS_ORIGINS to a comma list for production.
+# If you see 403 to port 5000 on macOS, try PORT=5001 (AirPlay sometimes binds :5000).
+_cors = (os.environ.get("CORS_ORIGINS") or "*").strip()
+_cors_headers = ["Content-Type", "Authorization", "X-Requested-With"]
+_cors_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
+if _cors == "*":
+    CORS(app, origins="*", allow_headers=_cors_headers, methods=_cors_methods)
+else:
+    CORS(
+        app,
+        origins=[o.strip() for o in _cors.split(",") if o.strip()],
+        allow_headers=_cors_headers,
+        methods=_cors_methods,
+    )
+
+# Allow URL with or without "/" at the end (both /api/home and /api/home/ work the same)
+app.url_map.strict_slashes = False
 
 # Thumbnails: prefer DB `image_url` in enrich_card; else Static Maps / defaults / per-name Unsplash
 DEFAULT_DEST_IMAGE = (
     "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=60"
 )
 DESTINATION_IMAGES = {
-    "skardu": "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=60",
-    "hunza": "https://images.unsplash.com/photo-1534949849017-ec5cfb6c7d2f?auto=format&fit=crop&w=1200&q=60",
-    "murree": "https://images.unsplash.com/photo-1587502537745-4e39f3d5a6e0?auto=format&fit=crop&w=1200&q=60",
-    "nathia": "https://images.unsplash.com/photo-1470770903676-69b98201ea1c?auto=format&fit=crop&w=1200&q=60",
-    "islamabad": "https://images.unsplash.com/photo-1549880338-65ddcdfd017b?auto=format&fit=crop&w=1200&q=60",
-    "naltar": "https://images.unsplash.com/photo-1504198453319-5ce911bafcde?auto=format&fit=crop&w=1200&q=60",
-    "naran": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=60",
-    "kaghan": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1200&q=60",
 }
 
 
@@ -108,17 +133,25 @@ def _attach_trip_destination_image(trip, keep_dest_coordinates=False):
 
 
 def _parse_profile_body(data):
-    # Accept simple form: styles array + budget (PKR) from the React app
+    # Accept simple form: styles array (DB category slugs, lowercase) + budget (PKR) from the React app
     if not data:
         return {}
     styles = data.get("styles")
     if isinstance(styles, list) and len(styles) > 0:
-        # Store as travel_style + categories list text
-        travel_style = styles[0].lower()
-        combined = ", ".join(styles)
+        norm = [str(s).strip().lower() for s in styles if s and str(s).strip()]
+        travel_style = norm[0] if norm else (data.get("preferred_travel_style") or "nature")
+        combined = ", ".join(dict.fromkeys(norm))  # de-dupe, preserve order
     else:
-        travel_style = data.get("preferred_travel_style")
+        travel_style = (data.get("preferred_travel_style") or "nature")
+        if isinstance(travel_style, str):
+            travel_style = travel_style.strip().lower()
         combined = data.get("preferred_categories")
+        if isinstance(combined, str):
+            combined = ", ".join(
+                dict.fromkeys(
+                    c.strip().lower() for c in combined.split(",") if c and c.strip()
+                )
+            )
     if data.get("budget") is not None and not data.get("budget_range"):
         b = int(data["budget"])
         if b <= 20000:
@@ -129,12 +162,16 @@ def _parse_profile_body(data):
             br = "premium"
     else:
         br = data.get("budget_range")
+    if isinstance(styles, list) and data.get("styles") is not None and len(styles) == 0:
+        combined = ""
+    elif not combined:
+        combined = "nature"
     return {
         "preferred_travel_style": travel_style
-        or data.get("preferred_travel_style")
+        or (data.get("preferred_travel_style") or "nature")
         or "nature",
         "budget_range": br or "standard",
-        "preferred_categories": combined or data.get("preferred_categories") or "nature",
+        "preferred_categories": combined,
         "typical_trip_duration_days": data.get("typical_trip_duration_days")
         or data.get("duration")
         or 3,
@@ -182,17 +219,20 @@ def _profile_to_frontend(prof):
     if not prof:
         return {
             "budget": 25000,
-            "styles": ["Nature"],
+            "styles": [],
             "duration": 3,
         }
-    st = (prof.get("preferred_travel_style") or "Nature").title()
-    cats = (prof.get("preferred_categories") or prof.get("preferred_travel_style") or "")
-    styles = [c.strip() for c in (cats or "").split(",") if c.strip()] or [st]
+    raw_cats = prof.get("preferred_categories") or prof.get("preferred_travel_style") or ""
+    styles = [c.strip().lower() for c in (raw_cats or "").split(",") if c.strip()]
+    st = (prof.get("preferred_travel_style") or "").strip().lower()
+    if st and st not in styles:
+        styles.insert(0, st)
+    styles = list(dict.fromkeys(styles))
     bmap = {"economy": 20000, "standard": 40000, "premium": 80000}
     budget = bmap.get((prof.get("budget_range") or "standard").lower(), 20000)
     return {
         "budget": budget,
-        "styles": [s[0].upper() + s[1:] if s else s for s in styles],
+        "styles": styles,
         "duration": int(prof.get("typical_trip_duration_days") or 3),
     }
 
@@ -335,22 +375,71 @@ def search_dest():
     )
 
 
+def _profile_budget_pkr_hint(prof):
+    if not prof:
+        return None
+    bmap = {"economy": 20000, "standard": 40000, "premium": 80000}
+    return bmap.get((prof.get("budget_range") or "standard").lower(), 40000)
+
+
+def _build_home_suggestions(prof, budget_hint_pkr):
+    default_chips = [
+        "Ideal weekend destinations this month in northern Pakistan",
+        "Best budget trips under 20,000 PKR",
+        "Top-rated adventure places near Islamabad",
+    ]
+    if not prof:
+        return default_chips
+    cats = [c.strip() for c in (prof.get("preferred_categories") or "").split(",") if c.strip()]
+    if not cats:
+        return default_chips
+    c0, c1 = cats[0], cats[1] if len(cats) > 1 else None
+    btxt = f" (~{int(budget_hint_pkr):,} PKR trip budget in mind)" if budget_hint_pkr else ""
+    out = [
+        f"Explore {c0} destinations in northern Pakistan",
+        f"Top-rated {c0} getaways for your next trip" + btxt,
+    ]
+    if c1:
+        out.append(f"Compare {c0} and {c1} — see what matches you best")
+    else:
+        out.append(f"More {c0} ideas hand-picked for your style")
+    return out[:3]
+
+
 @app.route("/api/home", methods=["GET"])
 def home_feed():
     user_id = request.args.get("user_id", type=int)
     greeting = "Welcome to Smart Travel! Plan your next trip with AI."
+    prof = db.get_profile(user_id) if user_id else None
     if user_id:
         u = db.get_user_by_id(user_id)
         if u:
             first = (u.get("full_name") or "Traveler").split()[0]
             greeting = f"Welcome back, {first}! Ready for your next adventure?"
 
-    featured = [enrich_card(d) for d in db.list_destinations(limit=6)]
-    suggestions = [
+    default_chips = [
         "Ideal weekend destinations this month in northern Pakistan",
         "Best budget trips under 20,000 PKR",
         "Top-rated adventure places near Islamabad",
     ]
+    if user_id and prof:
+        all_d = db.list_destinations(limit=200)
+        enriched = [enrich_card(d) for d in all_d]
+        merged_profile = {
+            "preferred_travel_style": prof.get("preferred_travel_style"),
+            "typical_trip_duration_days": prof.get("typical_trip_duration_days"),
+            "budget_range": prof.get("budget_range"),
+            "preferred_categories": prof.get("preferred_categories") or "",
+        }
+        ranked = run_recommendation(
+            user_id, merged_profile, enriched, top_n=6
+        )
+        featured = [r["destination"] for r in ranked]
+        budget_hint = _profile_budget_pkr_hint(prof)
+        suggestions = _build_home_suggestions(prof, budget_hint)
+    else:
+        featured = [enrich_card(d) for d in db.list_destinations(limit=6)]
+        suggestions = default_chips
     # Weather: RapidAPI Open Weather 13 (lat/lon) — default Islamabad
     weather = {
         "location": "Islamabad",
@@ -373,11 +462,17 @@ def home_feed():
         "General advisory: check local road and weather conditions before travel to hilly areas."
     )
 
+    pcats = []
+    if prof and (prof.get("preferred_categories") or "").strip():
+        pcats = [c.strip() for c in prof["preferred_categories"].split(",") if c.strip()]
+
     return jsonify(
         {
             "greeting": greeting,
             "featured": featured,
             "suggestions": suggestions,
+            "featured_personalized": bool(user_id and prof),
+            "preference_categories": pcats,
             "weather": weather,
             "travel_advisory": travel_advisory,
         }
@@ -418,7 +513,7 @@ def recommendations(user_id):
         "budget_range": prof.get("budget_range"),
         "preferred_categories": prof.get("preferred_categories") or prof.get("preferred_travel_style"),
     }
-    ranked = recommendation_logic.run_recommendation(
+    ranked = run_recommendation(
         user_id, merged_profile, [enrich_card(d) for d in all_d]
     )
     for r in ranked[:3]:
@@ -615,7 +710,7 @@ def plan_trip():
 
 @app.route("/api/estimate", methods=["POST"])
 def estimate():
-    from utils_cost import estimate_trip_cost
+    from cost.estimate import estimate_trip_cost
 
     data = request.get_json() or {}
     dest_id = data.get("destination_id")

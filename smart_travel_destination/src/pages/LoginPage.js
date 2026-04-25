@@ -1,7 +1,8 @@
+// Sign-in page: sends email/password to the API, then saves the user in AuthContext.
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getApiBase } from '../api/client';
+import { apiUrl } from '../api/client';
 
 export default function LoginPage() {
   const [form, setForm] = useState({ email: '', password: '' });
@@ -14,7 +15,7 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const res = await fetch(`${getApiBase()}/api/login`, {
+      const res = await fetch(apiUrl('/api/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

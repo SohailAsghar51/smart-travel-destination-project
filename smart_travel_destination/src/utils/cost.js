@@ -1,6 +1,6 @@
 /**
  * Client-side cost breakdown using destination `cost` (avg per day, PKR) from the API
- * and the same defaults as `smart_travel_backend/utils_cost.py` — no static JSON.
+ * and the same defaults as `smart_travel_backend/cost/estimate.py` — no static JSON.
  */
 const DEFAULT_RATES = {
   hotelPerNight: 4000,
