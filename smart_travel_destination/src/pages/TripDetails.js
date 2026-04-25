@@ -46,6 +46,7 @@ export default function TripDetails() {
   const [planNotes, setPlanNotes] = useState('');
   const notesDebounced = useDebouncedValue(planNotes, 650);
   const [hasReceivedPlan, setHasReceivedPlan] = useState(false);
+  const [fallbackMapUrl, setFallbackMapUrl] = useState(null);
   const [liveWeather, setLiveWeather] = useState(null);
   const [liveWeatherNote, setLiveWeatherNote] = useState('');
 
@@ -55,6 +56,21 @@ export default function TripDetails() {
     setAiPlan(null);
     setHasReceivedPlan(false);
     setPlanError('');
+    setFallbackMapUrl(null);
+  }, [destIdNum]);
+
+  // Static map for destination + catalog places (no AI plan required — e.g. preview error or missing plan).
+  useEffect(() => {
+    if (destIdNum == null) return undefined;
+    const ac = new AbortController();
+    fetch(apiUrl(`/api/destinations/${destIdNum}/map-image`), { signal: ac.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (j && j.map_image_url) setFallbackMapUrl(j.map_image_url);
+        else setFallbackMapUrl(null);
+      })
+      .catch(() => setFallbackMapUrl(null));
+    return () => ac.abort();
   }, [destIdNum]);
 
   useEffect(() => {
@@ -273,6 +289,20 @@ export default function TripDetails() {
 
   const displayPlan = aiPlan?.itinerary;
   const tripMeta = aiPlan?.trip_meta;
+  const staticMapUrl = aiPlan?.map_image_url || fallbackMapUrl;
+
+  const mapCaption = (() => {
+    if (planError) {
+      return 'We could not load the AI day-by-day plan. Here are approximate locations of places in our catalog for this destination (OpenStreetMap preview).';
+    }
+    if (displayPlan && staticMapUrl) {
+      return 'Plan stops and catalog place locations (OpenStreetMap preview).';
+    }
+    if (staticMapUrl) {
+      return 'Approximate locations of places in our catalog (OpenStreetMap preview). A day-by-day plan will appear here when available.';
+    }
+    return '';
+  })();
   const showDurationLine =
     tripMeta && typeof tripMeta.total_days === 'number'
       ? `${tripMeta.total_days} day${tripMeta.total_days === 1 ? '' : 's'} · ${
@@ -325,6 +355,16 @@ export default function TripDetails() {
       <div className="plan-grid">
         <main className="plan-main">
           {planError && <div className="plan-error-banner">{planError}</div>}
+
+          {staticMapUrl && (
+            <section className="plan-static-map-section" aria-label="Map preview">
+              <h2 className="plan-static-map-title">Map</h2>
+              {mapCaption && <p className="muted small plan-static-map-caption">{mapCaption}</p>}
+              <div className="plan-static-map-frame">
+                <img src={staticMapUrl} alt="" className="plan-static-map-img" loading="lazy" />
+              </div>
+            </section>
+          )}
 
           {planLoading && !hasReceivedPlan && (
             <div className="plan-skeleton" aria-hidden>

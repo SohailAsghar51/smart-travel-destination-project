@@ -219,6 +219,20 @@
 .plan-error-banner {
   background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 10px 14px; border-radius: 8px; margin-bottom: 16px;
 }
+
+.plan-static-map-section {
+  margin-bottom: 20px; text-align: left;
+}
+.plan-static-map-title { font-size: 1.15rem; margin: 0 0 6px; color: #0f172a; }
+.plan-static-map-caption { margin: 0 0 10px; line-height: 1.45; max-width: 58ch; }
+.plan-static-map-frame {
+  border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; background: #f1f5f9; line-height: 0;
+  box-shadow: 0 2px 10px rgba(2,6,23,0.06);
+}
+.plan-static-map-img {
+  width: 100%; height: auto; max-height: 360px; object-fit: cover; display: block;
+}
+.saved-trip-map .plan-static-map-img { max-height: 400px; }
 .plan-refreshing { margin: -4px 0 12px; }
 .plan-skeleton { margin-bottom: 20px; }
 .plan-skeleton-pills { height: 32px; background: linear-gradient(90deg, #e2e8f0, #f1f5f9, #e2e8f0); background-size: 200% 100%; border-radius: 8px; margin-bottom: 16px; animation: planShine 1.2s ease-in-out infinite; }

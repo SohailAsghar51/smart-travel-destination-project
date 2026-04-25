@@ -1,1 +1,1 @@
-"""Map / static imagery helpers (Google Static Maps)."""
+"""Map / static imagery helpers (OpenStreetMap static previews, no API key)."""

@@ -23,12 +23,7 @@ from flask_cors import CORS
 from werkzeug.security import check_password_hash
 
 import db.repository as db
-from config import (
-    GOOGLE_MAPS_API_KEY,
-    GROQ_API_KEY,
-    GROQ_MODEL,
-    RAPIDAPI_KEY,
-)
+from config import GROQ_API_KEY, GROQ_MODEL, RAPIDAPI_KEY
 from clients.weather import fetch_weather_latlon, format_weather_context_for_groq
 from clients.groq import (
     build_itinerary_from_places_with_groq,
@@ -37,7 +32,7 @@ from clients.groq import (
     sum_itinerary_cost_pkr,
 )
 from maps.static_maps import (
-    collect_itinerary_map_points,
+    collect_trip_map_points,
     destination_hero_image_url,
     itinerary_map_image_url,
 )
@@ -64,7 +59,7 @@ else:
 # Allow URL with or without "/" at the end (both /api/home and /api/home/ work the same)
 app.url_map.strict_slashes = False
 
-# Thumbnails: prefer DB `image_url` in enrich_card; else Static Maps / defaults / per-name Unsplash
+# Thumbnails: prefer DB `image_url` in enrich_card; else OSM static map / defaults / per-name Unsplash
 DEFAULT_DEST_IMAGE = (
     "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=60"
 )
@@ -186,7 +181,7 @@ def health():
             "ok": True,
             "groq_configured": bool(GROQ_API_KEY),
             "groq_model": GROQ_MODEL,
-            "google_maps_configured": bool(GOOGLE_MAPS_API_KEY),
+            "static_map_provider": "openstreetmap (no key)",
             "rapidapi_weather_configured": bool(RAPIDAPI_KEY),
         }
     )
@@ -323,6 +318,28 @@ def one_dest(dest_id):
     if not d:
         return jsonify({"message": "Not found"}), 404
     return jsonify(enrich_card(d))
+
+
+@app.route("/api/destinations/<dest_id>/map-image", methods=["GET"])
+def destination_map_image(dest_id):
+    """
+    Static map image (OpenStreetMap via staticmap.openstreetmap.de) for the destination + catalog places, no AI plan required.
+    Used when the trip page cannot build a day-by-day plan but we still want pins.
+    """
+    try:
+        did = int(dest_id)
+    except (TypeError, ValueError):
+        return jsonify({"message": "Invalid destination id"}), 400
+    d = db.get_destination_by_id(did)
+    if not d:
+        return jsonify({"message": "Not found"}), 404
+    dbid = d.get("db_id") or did
+    places = db.get_places_by_destination(dbid, limit=120) or []
+    pts = collect_trip_map_points([], d, places)
+    url = itinerary_map_image_url(pts, size="1200x520")
+    if not url and d.get("latitude") is not None and d.get("longitude") is not None:
+        url = destination_hero_image_url(d.get("latitude"), d.get("longitude"), size="1200x520")
+    return jsonify({"map_image_url": url})
 
 
 @app.route("/api/destinations/<dest_id>/places", methods=["GET"])
@@ -690,7 +707,17 @@ def get_trip_detail(trip_id):
     if not detail:
         return jsonify({"message": "Trip not found"}), 404
     if detail.get("trip"):
-        _attach_trip_destination_image(detail["trip"], keep_dest_coordinates=True)
+        t = detail["trip"]
+        _attach_trip_destination_image(t, keep_dest_coordinates=True)
+        did = t.get("destination_id")
+        if did is not None:
+            places = db.get_places_by_destination(int(did), limit=120) or []
+            drow = {"latitude": t.get("latitude"), "longitude": t.get("longitude")}
+            pts = collect_trip_map_points(detail.get("itinerary") or [], drow, places)
+            murl = itinerary_map_image_url(pts, size="1200x520")
+            if not murl and t.get("latitude") is not None and t.get("longitude") is not None:
+                murl = destination_hero_image_url(t["latitude"], t["longitude"], size="1200x520")
+            detail["map_image_url"] = murl
     return jsonify(detail)
 
 
@@ -750,7 +777,7 @@ def _build_trip_plan_dict(dest_id, days, total_budget_pkr, user_message, include
         est = int(total_budget_pkr) if total_budget_pkr else int(per_day * 0.4 + 5000 * int(days))
     map_url = None
     if include_map_url:
-        map_pts = collect_itinerary_map_points(itin, d)
+        map_pts = collect_trip_map_points(itin, d, places)
         map_url = itinerary_map_image_url(map_pts, size="1200x520")
         if not map_url and d.get("latitude") is not None and d.get("longitude") is not None:
             map_url = destination_hero_image_url(
@@ -786,7 +813,7 @@ def preview_trip():
     user_message = (data.get("user_message") or data.get("query") or "").strip()
     b_int = int(budget) if budget is not None and str(budget) != "" else None
     out, err = _build_trip_plan_dict(
-        int(dest_id), days, b_int, user_message, include_map_url=False
+        int(dest_id), days, b_int, user_message, include_map_url=True
     )
     if err:
         return jsonify({"message": err}), 400

@@ -1,55 +1,89 @@
 """
-Map pictures for the app (not live maps — we only build *image URLs*).
+Map preview images: single image URLs (no JavaScript) using OpenStreetMap data.
 
-We use Google "Static Map" (one image file). You need GOOGLE_MAPS_API_KEY in .env
-and the Static Maps API turned on in Google Cloud. If the key is missing, functions
-return None and the app uses a photo (Unsplash) or something else.
+We use the public static map service at staticmap.openstreetmap.de — no API key.
+For heavy production traffic, host your own static map service or use tiles + a map library
+on the client instead.
 """
 
 from urllib.parse import urlencode
 
-from config import GOOGLE_MAPS_API_KEY
+# Public OSM static map (Mapnik). No key; be respectful of load (cache if you scale up).
+_OSM_STATIC = "https://staticmap.openstreetmap.de/staticmap.php"
 
-# Google endpoint for a single PNG/JPEG map image
-STATIC_BASE = "https://maps.googleapis.com/maps/api/staticmap"
+
+def _parse_wh(size: str) -> tuple[int, int]:
+    parts = (size or "800x400").lower().split("x")
+    try:
+        w = int(parts[0]) if len(parts) > 0 else 800
+    except ValueError:
+        w = 800
+    try:
+        h = int(parts[1]) if len(parts) > 1 else 400
+    except ValueError:
+        h = 400
+    # Service limits vary; keep reasonable.
+    w = max(50, min(w, 1280))
+    h = max(50, min(h, 1280))
+    return w, h
+
+
+def _zoom_for_spread(dlat: float, dlon: float) -> int:
+    """Pick zoom level from geographic span in degrees (rough fit for Pakistan-scale to city)."""
+    span = max(dlat, dlon, 0.0001)
+    if span > 8.0:
+        return 5
+    if span > 3.0:
+        return 6
+    if span > 1.0:
+        return 7
+    if span > 0.4:
+        return 8
+    if span > 0.15:
+        return 9
+    if span > 0.06:
+        return 10
+    if span > 0.025:
+        return 11
+    if span > 0.012:
+        return 12
+    if span > 0.006:
+        return 13
+    return 14
 
 
 def destination_hero_image_url(latitude, longitude, size="1200x500", zoom=11):
     """
-    One static map: center on the place, one pin. Used for destination cards and headers.
+    One static map: center on a single coordinate with one pin.
 
-    `latitude` / `longitude` must be numbers. Returns None if there is no API key
-    or the coordinates are bad.
+    Returns None only if coordinates are missing or not numeric.
     """
-    if not GOOGLE_MAPS_API_KEY or latitude is None or longitude is None:
+    if latitude is None or longitude is None:
         return None
     try:
         lat = float(latitude)
         lon = float(longitude)
     except (TypeError, ValueError):
         return None
-    parts = (size or "1200x500").lower().split("x")
-    w, h = parts[0] if len(parts) > 0 else "1200", parts[1] if len(parts) > 1 else "500"
-    params = {
-        "center": f"{lat:.6f},{lon:.6f}",
-        "zoom": str(int(zoom)),
-        "size": f"{w}x{h}",
-        "maptype": "terrain",
-        "markers": f"color:0x1d4ed8|{lat:.6f},{lon:.6f}",
-        "scale": "2",
-        "key": GOOGLE_MAPS_API_KEY,
-    }
-    return f"{STATIC_BASE}?{urlencode(params)}"
+    w, h = _parse_wh(size)
+    z = max(1, min(18, int(zoom)))
+    q = [
+        ("center", f"{lat:.6f},{lon:.6f}"),
+        ("zoom", str(z)),
+        ("size", f"{w}x{h}"),
+        ("maptype", "mapnik"),
+        ("markers", f"{lat:.6f},{lon:.6f},red-pushpin"),
+    ]
+    return f"{_OSM_STATIC}?{urlencode(q)}"
 
 
 def itinerary_map_image_url(locations, size="1000x480", max_markers=15):
     """
-    One static map with many pins (for a saved or AI day-by-day plan).
+    One static map with several pins. Points need latitude/longitude (or lat/lon).
 
-    `locations` = list of dicts with latitude/longitude (or lat/lon) or (lat, lon) pairs.
-    We skip bad points. If there is only one point, we reuse the single-place helper above.
+    We skip bad points. Single-point case uses a slightly closer zoom.
     """
-    if not GOOGLE_MAPS_API_KEY or not locations:
+    if not locations:
         return None
     pts = []
     for p in locations[: int(max_markers)]:
@@ -67,32 +101,31 @@ def itinerary_map_image_url(locations, size="1000x480", max_markers=15):
         pts.append((la, lo))
     if not pts:
         return None
-    sparts = (size or "1000x480").lower().split("x")
-    sw, sh = sparts[0] if sparts else "1000", sparts[1] if len(sparts) > 1 else "480"
+    w, h = _parse_wh(size)
     if len(pts) == 1:
-        return destination_hero_image_url(pts[0][0], pts[0][1], size=f"{sw}x{sh}", zoom=12)
-    # Many points: fit the box that contains all markers (with a small border)
+        return destination_hero_image_url(pts[0][0], pts[0][1], size=f"{w}x{h}", zoom=12)
     lats = [p[0] for p in pts]
     lons = [p[1] for p in pts]
-    pad = 0.02
-    min_lat, max_lat = min(lats) - pad, max(lats) + pad
-    min_lon, max_lon = min(lons) - pad, max(lons) + pad
-    q = [
-        ("size", f"{sw}x{sh}"),
-        ("maptype", "roadmap"),
-        ("visible", f"{min_lat},{min_lon}|{max_lat},{max_lon}"),
-        ("scale", "2"),
-        ("key", GOOGLE_MAPS_API_KEY),
+    dlat = max(lats) - min(lats)
+    dlon = max(lons) - min(lons)
+    clat = (min(lats) + max(lats)) / 2.0
+    clon = (min(lons) + max(lons)) / 2.0
+    z = _zoom_for_spread(dlat, dlon)
+    q: list = [
+        ("center", f"{clat:.6f},{clon:.6f}"),
+        ("zoom", str(z)),
+        ("size", f"{w}x{h}"),
+        ("maptype", "mapnik"),
     ]
     for i, (la, lo) in enumerate(pts):
-        color = "0x1d4ed8" if i == 0 else "0xdc2626"
-        q.append(("markers", f"color:{color}|size:mid|{la:.5f},{lo:.5f}"))
-    return f"{STATIC_BASE}?{urlencode(q, doseq=True)}"
+        icon = "red-pushpin" if i == 0 else "ltinyred"
+        q.append(("markers", f"{la:.5f},{lo:.5f},{icon}"))
+    return f"{_OSM_STATIC}?{urlencode(q, doseq=True)}"
 
 
 def collect_itinerary_map_points(itinerary, destination_row=None):
     """
-    Build a clean list of map points: destination first, then each day’s items (no duplicates).
+    Build a clean list of map points: destination first, then each day's items (no duplicates).
 
     `itinerary` = the JSON structure with days and items. `destination_row` = the main
     destination from the database (so the map always starts there if we have coordinates).
@@ -119,3 +152,30 @@ def collect_itinerary_map_points(itinerary, destination_row=None):
         for it in day.get("items") or []:
             add_pt(it.get("latitude"), it.get("longitude"))
     return out
+
+
+def collect_trip_map_points(itinerary, destination_row, places_list=None, max_markers=15):
+    """
+    Map pins for a trip: same as collect_itinerary_map_points, then add DB place coordinates
+    so the static map still shows real POIs when the plan has no per-item lat/lon (e.g. rule-based fallback).
+    """
+    out = collect_itinerary_map_points(itinerary, destination_row)
+    if not places_list:
+        return out[: int(max_markers)]
+    seen = {(round(p["latitude"], 5), round(p["longitude"], 5)) for p in out}
+    for pl in places_list:
+        if len(out) >= int(max_markers):
+            break
+        la, lo = pl.get("latitude"), pl.get("longitude")
+        if la is None or lo is None:
+            continue
+        try:
+            a, b = float(la), float(lo)
+        except (TypeError, ValueError):
+            continue
+        key = (round(a, 5), round(b, 5))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"latitude": a, "longitude": b})
+    return out[: int(max_markers)]

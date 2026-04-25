@@ -82,7 +82,7 @@ export default function SavedTripPage() {
     );
   }
 
-  const { trip, cost_breakdown, itinerary, trip_meta } = data;
+  const { trip, cost_breakdown, itinerary, trip_meta, map_image_url: tripMapUrl } = data;
   const displayPlan = itinerary || [];
   const destId = trip.destination_id;
   const heroUrl = trip.image || trip.image_url || SAVED_TRIP_HERO_FALLBACK;
@@ -117,6 +117,20 @@ export default function SavedTripPage() {
           )}
         </div>
       </div>
+
+      {tripMapUrl && (
+        <section className="plan-static-map-section saved-trip-map" style={{ marginTop: 20 }} aria-label="Trip map">
+          <h2 className="saved-trip-h2">Map</h2>
+          <p className="muted small plan-static-map-caption">
+            {displayPlan.length > 0
+              ? 'Your saved stops and nearby catalog places (OpenStreetMap preview).'
+              : 'Catalog place locations for this destination; no day rows were stored for this trip.'}
+          </p>
+          <div className="plan-static-map-frame">
+            <img src={tripMapUrl} alt="" className="plan-static-map-img" loading="lazy" />
+          </div>
+        </section>
+      )}
 
       <div className="saved-trip-costs">
         <h2 className="saved-trip-h2">Costs (saved)</h2>

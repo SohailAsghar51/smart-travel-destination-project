@@ -31,6 +31,3 @@ RAPIDAPI_WEATHER_URL = os.environ.get(
     "https://open-weather13.p.rapidapi.com/latlon",
 )
 
-# Optional: Google Maps Static API (hero images for destinations, itinerary map images)
-GOOGLE_MAPS_API_KEY = (os.environ.get("GOOGLE_MAPS_API_KEY") or "").strip()
-
