@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
 import CostSummary from './CostSummary';
 
+const DEFAULT_DEST_HERO =
+  'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=60';
+
 export default function DestinationModal({ dest, onClose }) {
   const [days, setDays] = useState(3);
+  const heroUrl = dest.image || dest.image_url || DEFAULT_DEST_HERO;
 
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true">
       <div className="modal">
         <button className="modal-close" onClick={onClose}>×</button>
         <div className="modal-grid">
-          <div className="modal-image" style={{ backgroundImage: `url(${dest.image})` }} />
+          <div className="modal-image" style={{ backgroundImage: `url(${heroUrl})` }} />
           <div className="modal-body">
             <h2>{dest.name}</h2>
             <div className="muted">{dest.region} • {dest.type}</div>

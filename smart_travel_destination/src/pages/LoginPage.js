@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { getApiBase } from '../api/client';
 
 export default function LoginPage() {
   const [form, setForm] = useState({ email: '', password: '' });
@@ -13,26 +14,31 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const res = await fetch("http://localhost:5000/login/", {
-        method: "POST",
+      const res = await fetch(`${getApiBase()}/api/login`, {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json"
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(form)
+        body: JSON.stringify(form),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.message);
+        throw new Error(data.message || 'Login failed');
       }
-     
-      auth.login(data.data)
-      alert("Login Success");
-      navigate("/profile");
 
-    }
-     catch (err) {
+      auth.login(
+        {
+          id: data.data.id,
+          name: data.data.name,
+          email: data.data.email,
+          saved: [],
+        },
+        data.profile
+      );
+      navigate('/profile');
+    } catch (err) {
       setError(err.message);
     }
   }
@@ -46,7 +52,9 @@ export default function LoginPage() {
         <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
         {error && <div className="error">{error}</div>}
         <div style={{ marginTop: 8 }}>
-          <button className="btn" type="submit">Sign in</button>
+          <button className="btn" type="submit">
+            Sign in
+          </button>
         </div>
       </form>
     </div>

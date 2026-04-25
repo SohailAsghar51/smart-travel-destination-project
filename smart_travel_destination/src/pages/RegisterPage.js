@@ -12,7 +12,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setError(null);
     try {
-      auth.register(form);
+      await auth.register(form);
       navigate('/profile');
     } catch (err) {
       setError(err.message || String(err));
@@ -31,7 +31,9 @@ export default function RegisterPage() {
         <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
         {error && <div className="error">{error}</div>}
         <div style={{ marginTop: 8 }}>
-          <button className="btn" type="submit">Register</button>
+          <button className="btn" type="submit">
+            Register
+          </button>
         </div>
       </form>
     </div>
