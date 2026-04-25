@@ -34,12 +34,14 @@ def _row_to_user(row):
     """Turn one SQL result row (tuple) into a small dict for the API (for lists without password)."""
     if not row:
         return None
+    role = (row[5] or "user").strip().lower() if row[5] else "user"
     return {
         "id": row[0],
         "full_name": row[1],
         "email": row[2],
         "auth_provider": row[3],
         "profile_picture_url": row[4],
+        "role": role,
     }
 
 
@@ -73,7 +75,7 @@ def get_user_by_email(email):
     conn = create_database_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT id, full_name, email, auth_provider, profile_picture_url, password_hash "
+        "SELECT id, full_name, email, auth_provider, profile_picture_url, password_hash, role "
         "FROM users WHERE email = %s AND is_active = 1",
         (email,),
     )
@@ -89,6 +91,7 @@ def get_user_by_email(email):
         "auth_provider": row[3],
         "profile_picture_url": row[4],
         "password_hash": row[5],
+        "role": (row[6] or "user").strip().lower(),
     }
     return u
 
@@ -101,6 +104,7 @@ def verify_user_login(email, password_plain):
     if not check_password_hash(u["password_hash"], password_plain):
         return None
     u.pop("password_hash", None)
+    u["role"] = (u.get("role") or "user").strip().lower()
     return u
 
 
@@ -109,7 +113,7 @@ def get_user_by_id(user_id):
     conn = create_database_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT id, full_name, email, auth_provider, profile_picture_url FROM users "
+        "SELECT id, full_name, email, auth_provider, profile_picture_url, role FROM users "
         "WHERE id = %s AND is_active = 1",
         (user_id,),
     )
@@ -674,6 +678,139 @@ def update_destination(
     conn.commit()
     cursor.close()
     conn.close()
+
+
+def is_user_admin(user_id):
+    """True if this user has role admin (active account)."""
+    conn = create_database_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT role FROM users WHERE id = %s AND is_active = 1",
+        (int(user_id),),
+    )
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    if not row or row[0] is None:
+        return False
+    return str(row[0]).strip().lower() == "admin"
+
+
+def create_destination(
+    name,
+    region,
+    category,
+    avg_cost_pkr,
+    latitude,
+    longitude,
+    country="Pakistan",
+    description=None,
+    best_season=None,
+    climate=None,
+    safety_rating=4.0,
+    rating=4.0,
+    popularity_score=0.0,
+    image_url=None,
+):
+    """Insert a destination row. Returns new id or None on duplicate name / DB error."""
+    conn = create_database_connection()
+    cursor = conn.cursor()
+    q = (
+        "INSERT INTO destinations (name, country, region, category, description, avg_cost_pkr, "
+        "best_season, climate, safety_rating, rating, popularity_score, latitude, longitude, is_active, image_url) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 1, %s)"
+    )
+    try:
+        cursor.execute(
+            q,
+            (
+                name.strip(),
+                country.strip() if country else "Pakistan",
+                region.strip(),
+                category.strip(),
+                description,
+                int(avg_cost_pkr),
+                best_season,
+                climate,
+                float(safety_rating),
+                float(rating),
+                float(popularity_score),
+                float(latitude),
+                float(longitude),
+                (image_url or "").strip() or None,
+            ),
+        )
+        new_id = cursor.lastrowid
+        conn.commit()
+        return int(new_id) if new_id else None
+    except mysql.connector.IntegrityError:
+        conn.rollback()
+        return None
+    except mysql.connector.Error:
+        conn.rollback()
+        return None
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def create_place(
+    destination_id,
+    name,
+    category,
+    main_type,
+    latitude,
+    longitude,
+    description=None,
+    cost_pkr=None,
+    rating=None,
+    address=None,
+):
+    """
+    Insert a place (hotel, restaurant, or attraction) for a destination.
+    main_type must be one of: hotel, restaurant, attraction (per DB check constraint).
+    """
+    mt = (main_type or "").strip().lower()
+    if mt not in ("hotel", "restaurant", "attraction"):
+        return None
+    conn = create_database_connection()
+    cursor = conn.cursor()
+    q = (
+        "INSERT INTO places (destination_id, name, category, main_type, description, "
+        "latitude, longitude, cost_pkr, rating, address, source, is_active) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'admin', 1)"
+    )
+    try:
+        cr = int(cost_pkr) if cost_pkr is not None else None
+        if cr is not None and cr < 0:
+            cr = 0
+        rt = float(rating) if rating is not None else None
+        if rt is not None:
+            rt = max(0.0, min(5.0, rt))
+        cursor.execute(
+            q,
+            (
+                int(destination_id),
+                name.strip(),
+                category.strip(),
+                mt,
+                description,
+                float(latitude),
+                float(longitude),
+                cr,
+                rt,
+                (address or "").strip() or None,
+            ),
+        )
+        new_id = cursor.lastrowid
+        conn.commit()
+        return int(new_id) if new_id else None
+    except mysql.connector.Error:
+        conn.rollback()
+        return None
+    finally:
+        cursor.close()
+        conn.close()
 
 
 # --- POIs: hotels, restaurants, … linked to a destination_id ---

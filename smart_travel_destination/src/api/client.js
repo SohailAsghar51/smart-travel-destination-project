@@ -11,13 +11,16 @@ export function getApiBase() {
 }
 
 /**
- * One full API URL. We always use a "/" before "?" in the path (style: /api/home/ not /api/home).
- * path: like "/api/home" or "/api/trips" — you can skip or keep the final "/"; we add it if missing.
- * For "?query=1", do: \`\${apiUrl('/api/weather')}?lat=...\`  (the "?" part comes after the trailing slash)
+ * One full API URL. For paths without a query, we add a trailing "/" (to match the Flask app).
+ * If the path already contains "?", we do not add "/" (or it would break ?limit=500 into limit=500/).
+ * For query args, you can also do: \`\${apiUrl('/api/weather')}?lat=...\`
  */
 export function apiUrl(path) {
   const base = getApiBase();
   let p = path.startsWith('/') ? path : `/${path}`;
+  if (p.includes('?')) {
+    return `${base}${p}`;
+  }
   if (!p.endsWith('/')) p += '/';
   return `${base}${p}`;
 }

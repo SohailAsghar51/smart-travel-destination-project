@@ -23,7 +23,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const s = readSession();
     if (s && s.user) {
-      setUser(s.user);
+      setUser({ ...s.user, role: s.user.role || 'user' });
       setProfile(s.profile || null);
     }
   }, []);
@@ -69,6 +69,7 @@ export function AuthProvider({ children }) {
       email: data.user.email,
       full_name: data.user.full_name,
       saved: [],
+      role: data.user.role || 'user',
     };
     persist(u, data.profile);
     return u;
@@ -81,6 +82,7 @@ export function AuthProvider({ children }) {
       email: sessionUser.email,
       full_name: sessionUser.name,
       saved: sessionUser.saved || [],
+      role: sessionUser.role || 'user',
     };
     persist(u, prof);
   }

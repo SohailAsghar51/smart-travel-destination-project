@@ -248,6 +248,7 @@ def login():
         return jsonify({"message": "Invalid email or password"}), 401
     user = {**u, "name": u["full_name"]}
     prof = db.get_profile(u["id"]) or {}
+    role = (u.get("role") or "user").strip().lower()
     return jsonify(
         {
             "message": "Login successful",
@@ -255,8 +256,9 @@ def login():
                 "name": u["full_name"],
                 "email": u["email"],
                 "id": u["id"],
+                "role": role,
             },
-            "user": user,
+            "user": {**user, "role": role},
             "profile": _profile_to_frontend(prof),
         }
     )
@@ -321,6 +323,124 @@ def one_dest(dest_id):
     if not d:
         return jsonify({"message": "Not found"}), 404
     return jsonify(enrich_card(d))
+
+
+@app.route("/api/destinations/<dest_id>/places", methods=["GET"])
+def destination_places(dest_id):
+    """POIs (hotels, restaurants, attractions) for one destination (read-only catalog)."""
+    try:
+        did = int(dest_id)
+    except (TypeError, ValueError):
+        return jsonify({"message": "Invalid destination id"}), 400
+    if not db.get_destination_by_id(did):
+        return jsonify({"message": "Not found"}), 404
+    places = db.get_places_by_destination(did, limit=300) or []
+    return jsonify({"places": places})
+
+
+def _admin_user_id_from_json():
+    data = request.get_json(silent=True) or {}
+    uid = data.get("user_id")
+    try:
+        return int(uid) if uid is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _admin_forbidden():
+    """Returns a 403 response if the JSON body does not name an admin user, else None."""
+    uid = _admin_user_id_from_json()
+    if not uid or not db.is_user_admin(uid):
+        return jsonify({"message": "Forbidden"}), 403
+    return None
+
+
+@app.route("/api/admin/destinations", methods=["POST"])
+def admin_create_destination():
+    denied = _admin_forbidden()
+    if denied:
+        return denied
+    data = request.get_json() or {}
+    name = (data.get("name") or "").strip()
+    region = (data.get("region") or "").strip()
+    category = (data.get("category") or "").strip()
+    if not name or not region or not category:
+        return jsonify({"message": "name, region, and category are required"}), 400
+    try:
+        avg_cost = int(data.get("avg_cost_pkr", 0))
+        lat = float(data.get("latitude"))
+        lon = float(data.get("longitude"))
+    except (TypeError, ValueError):
+        return jsonify({"message": "avg_cost_pkr, latitude, and longitude must be valid numbers"}), 400
+    new_id = db.create_destination(
+        name,
+        region,
+        category,
+        avg_cost,
+        lat,
+        lon,
+        country=(data.get("country") or "Pakistan").strip(),
+        description=(data.get("description") or "").strip() or None,
+        best_season=(data.get("best_season") or "").strip() or None,
+        climate=(data.get("climate") or "").strip() or None,
+        safety_rating=float(data.get("safety_rating", 4.0)),
+        rating=float(data.get("rating", 4.0)),
+        popularity_score=float(data.get("popularity_score", 0.0)),
+        image_url=(data.get("image_url") or "").strip() or None,
+    )
+    if not new_id:
+        return jsonify({"message": "Could not create destination (duplicate name or invalid data)"}), 400
+    d = db.get_destination_by_id(new_id)
+    return jsonify({"id": new_id, "destination": d}), 201
+
+
+@app.route("/api/admin/places", methods=["POST"])
+def admin_create_place():
+    denied = _admin_forbidden()
+    if denied:
+        return denied
+    data = request.get_json() or {}
+    try:
+        dest_id = int(data.get("destination_id"))
+    except (TypeError, ValueError):
+        return jsonify({"message": "destination_id is required"}), 400
+    name = (data.get("name") or "").strip()
+    category = (data.get("category") or "").strip()
+    main_type = (data.get("main_type") or "").strip().lower()
+    if not name or not category or not main_type:
+        return jsonify({"message": "name, category, and main_type are required"}), 400
+    try:
+        lat = float(data.get("latitude"))
+        lon = float(data.get("longitude"))
+    except (TypeError, ValueError):
+        return jsonify({"message": "latitude and longitude are required"}), 400
+    if not db.get_destination_by_id(dest_id):
+        return jsonify({"message": "Destination not found"}), 404
+    cost_raw = data.get("cost_pkr")
+    try:
+        cost = int(cost_raw) if cost_raw is not None and str(cost_raw).strip() != "" else None
+    except (TypeError, ValueError):
+        return jsonify({"message": "cost_pkr must be a number"}), 400
+    rating_raw = data.get("rating")
+    try:
+        rating = float(rating_raw) if rating_raw is not None and str(rating_raw).strip() != "" else None
+    except (TypeError, ValueError):
+        return jsonify({"message": "rating must be a number"}), 400
+    new_id = db.create_place(
+        dest_id,
+        name,
+        category,
+        main_type,
+        lat,
+        lon,
+        description=(data.get("description") or "").strip() or None,
+        cost_pkr=cost,
+        rating=rating,
+        address=(data.get("address") or "").strip() or None,
+    )
+    if not new_id:
+        return jsonify({"message": "Could not create place (check main_type: hotel, restaurant, attraction)"}), 400
+    return jsonify({"id": new_id, "ok": True}), 201
 
 
 @app.route("/api/nlp/parse", methods=["POST"])

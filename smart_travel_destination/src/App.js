@@ -12,6 +12,7 @@ import ExplorePage from './pages/ExplorePage';
 import TripsPage from './pages/TripsPage';
 import SavedTripPage from './pages/SavedTripPage';
 import AboutPage from './pages/AboutPage';
+import AdminPage from './pages/AdminPage';
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
               <Route path="/trips" element={<TripsPage />} />
               <Route path="/trips/saved/:tripId" element={<SavedTripPage />} />
               <Route path="/about" element={<AboutPage />} />
+              <Route path="/admin" element={<AdminPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/profile" element={<ProfilePage />} />

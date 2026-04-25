@@ -29,12 +29,14 @@ export default function LoginPage() {
         throw new Error(data.message || 'Login failed');
       }
 
+      const u = data.user || {};
       auth.login(
         {
-          id: data.data.id,
-          name: data.data.name,
-          email: data.data.email,
+          id: u.id != null ? u.id : data.data.id,
+          name: u.full_name || data.data.name,
+          email: u.email || data.data.email,
           saved: [],
+          role: (u.role || data.data.role || 'user'),
         },
         data.profile
       );
