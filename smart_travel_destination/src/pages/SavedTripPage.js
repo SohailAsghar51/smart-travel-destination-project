@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiUrl } from '../api/client';
+import MapView from '../components/MapView';
 
 const SAVED_TRIP_HERO_FALLBACK =
   'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=60';
@@ -84,6 +85,32 @@ export default function SavedTripPage() {
 
   const { trip, cost_breakdown, itinerary, trip_meta, map_image_url: tripMapUrl } = data;
   const displayPlan = itinerary || [];
+
+  // Build a list of waypoints (places with lat/lng) and compute bbox for iframe embed
+  const waypoints = displayPlan.flatMap((day) =>
+    (day.items || [])
+      .filter((item) => item.place_latitude && item.place_longitude)
+      .map((item) => ({
+        lat: parseFloat(item.place_latitude),
+        lng: parseFloat(item.place_longitude),
+        name: item.title || item.place_name || `Day ${day.day_number}`,
+      }))
+  );
+
+  // Leaflet map with markers (OSM embed bbox never shows per-stop pins)
+  const mapViewWaypoints =
+    waypoints.length > 0
+      ? waypoints
+      : trip && trip.destination_latitude && trip.destination_longitude
+        ? [
+            {
+              lat: Number(trip.destination_latitude),
+              lng: Number(trip.destination_longitude),
+              name: trip.destination_name || 'Destination',
+            },
+          ]
+        : [];
+  const hasInteractiveMap = mapViewWaypoints.length > 0;
   const destId = trip.destination_id;
   const heroUrl = trip.image || trip.image_url || SAVED_TRIP_HERO_FALLBACK;
 
@@ -119,12 +146,12 @@ export default function SavedTripPage() {
       </div>
 
       {tripMapUrl && (
-        <section className="plan-static-map-section saved-trip-map" style={{ marginTop: 20 }} aria-label="Trip map">
-          <h2 className="saved-trip-h2">Map</h2>
+        <section className="plan-static-map-section saved-trip-map" aria-label="Trip map">
+          <h2 className="saved-trip-h2">Trip Map & Route</h2>
           <p className="muted small plan-static-map-caption">
             {displayPlan.length > 0
-              ? 'Your saved stops and nearby catalog places (OpenStreetMap preview).'
-              : 'Catalog place locations for this destination; no day rows were stored for this trip.'}
+              ? 'Your planned stops and nearby places (OpenStreetMap preview).'
+              : 'Catalog place locations for this destination.'}
           </p>
           <div className="plan-static-map-frame">
             <img src={tripMapUrl} alt="" className="plan-static-map-img" loading="lazy" />
@@ -132,54 +159,68 @@ export default function SavedTripPage() {
         </section>
       )}
 
+      {hasInteractiveMap && (
+        <section className="plan-interactive-map-section" aria-label="Interactive trip map">
+          <h2 className="saved-trip-h2">Interactive Trip Map</h2>
+          <p className="muted small plan-static-map-caption">
+            Explore your trip itinerary on an interactive map. Zoom in to see your planned stops in detail.
+          </p>
+          <div className="plan-interactive-map-container">
+            <MapView waypoints={mapViewWaypoints} height="450px" defaultZoom={13} />
+          </div>
+        </section>
+      )}
+
       <div className="saved-trip-costs">
-        <h2 className="saved-trip-h2">Costs (saved)</h2>
+        <h2 className="saved-trip-h2">Trip Summary & Costs</h2>
         <div className="saved-cost-grid">
           <div className="saved-cost-tile">
-            <span className="saved-cost-label">Budget (total)</span>
+            <span className="saved-cost-label">Budget Allocated</span>
             <span className="saved-cost-value">
               {trip.total_budget_pkr != null
-                ? `${Number(trip.total_budget_pkr).toLocaleString()} PKR`
+                ? `${Number(trip.total_budget_pkr).toLocaleString()}`
                 : '—'}
             </span>
+            {trip.total_budget_pkr && <span className="muted small" style={{ marginTop: 4, display: 'block' }}>PKR</span>}
           </div>
           <div className="saved-cost-tile">
-            <span className="saved-cost-label">Estimated total</span>
+            <span className="saved-cost-label">Estimated Cost</span>
             <span className="saved-cost-value">
-              {Number(trip.estimated_cost_pkr || 0).toLocaleString()} PKR
+              {Number(trip.estimated_cost_pkr || 0).toLocaleString()}
             </span>
+            <span className="muted small" style={{ marginTop: 4, display: 'block' }}>PKR</span>
           </div>
         </div>
         {cost_breakdown && (
-          <table className="saved-breakdown cost-summary" style={{ marginTop: 12, maxWidth: 480 }}>
+          <table className="saved-breakdown cost-summary" style={{ marginTop: 16, maxWidth: '100%' }}>
             <tbody>
               <tr>
-                <td>Transport</td>
-                <td>{cost_breakdown.transport_cost_pkr.toLocaleString()} PKR</td>
+                <td>🚗 Transport</td>
+                <td style={{ textAlign: 'right', fontWeight: 600 }}>{cost_breakdown.transport_cost_pkr.toLocaleString()} PKR</td>
               </tr>
               <tr>
-                <td>Accommodation</td>
-                <td>{cost_breakdown.accommodation_cost_pkr.toLocaleString()} PKR</td>
+                <td>🏨 Accommodation</td>
+                <td style={{ textAlign: 'right', fontWeight: 600 }}>{cost_breakdown.accommodation_cost_pkr.toLocaleString()} PKR</td>
               </tr>
               <tr>
-                <td>Food</td>
-                <td>{cost_breakdown.food_cost_pkr.toLocaleString()} PKR</td>
+                <td>🍽️ Food</td>
+                <td style={{ textAlign: 'right', fontWeight: 600 }}>{cost_breakdown.food_cost_pkr.toLocaleString()} PKR</td>
               </tr>
               <tr>
-                <td>Activities</td>
-                <td>{cost_breakdown.activities_cost_pkr.toLocaleString()} PKR</td>
+                <td>🎭 Activities</td>
+                <td style={{ textAlign: 'right', fontWeight: 600 }}>{cost_breakdown.activities_cost_pkr.toLocaleString()} PKR</td>
               </tr>
               <tr className="total">
-                <td>Total (line items)</td>
-                <td>{cost_breakdown.total_estimated_cost_pkr.toLocaleString()} PKR</td>
+                <td>Total</td>
+                <td style={{ textAlign: 'right' }}>{cost_breakdown.total_estimated_cost_pkr.toLocaleString()} PKR</td>
               </tr>
             </tbody>
           </table>
         )}
       </div>
 
-      <h2 className="saved-trip-h2" style={{ marginTop: 28 }}>Itinerary</h2>
-      {displayPlan.length === 0 && <p className="muted">No day rows stored for this trip.</p>}
+      <h2 className="saved-trip-h2" style={{ marginTop: 32 }}>Day-by-Day Itinerary</h2>
+      {displayPlan.length === 0 && <p className="muted" style={{ marginTop: 12 }}>No day rows stored for this trip.</p>}
       <div className="plan-day-list" style={{ marginTop: 12 }}>
         {displayPlan.map((day) => (
           <article key={day.day_number} className="plan-day-card">

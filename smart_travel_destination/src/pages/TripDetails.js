@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import CostSummary from '../components/CostSummary';
+import MapView from '../components/MapView';
 import { useAuth } from '../context/AuthContext';
 import { apiUrl } from '../api/client';
 
@@ -204,6 +205,39 @@ export default function TripDetails() {
     return () => ac.abort();
   }, [dest, destIdNum, days, queryTotalBudget, notesDebounced, autoHint]);
 
+  const interactiveMapWaypoints = useMemo(() => {
+    if (!dest) return [];
+    const plan = aiPlan?.itinerary;
+    if (Array.isArray(plan) && plan.length > 0) {
+      const fromPlan = plan
+        .flatMap((day) =>
+          (day.items || [])
+            .filter(
+              (item) =>
+                item.place_latitude != null &&
+                item.place_longitude != null &&
+                item.place_latitude !== '' &&
+                item.place_longitude !== ''
+            )
+            .map((item) => ({
+              lat: Number(item.place_latitude),
+              lng: Number(item.place_longitude),
+              name: item.title || item.place_name || `Day ${day.day_number}`,
+            }))
+        )
+        .filter((w) => Number.isFinite(w.lat) && Number.isFinite(w.lng));
+      if (fromPlan.length > 0) return fromPlan;
+    }
+    if (dest.latitude != null && dest.longitude != null) {
+      const la = Number(dest.latitude);
+      const lo = Number(dest.longitude);
+      if (Number.isFinite(la) && Number.isFinite(lo)) {
+        return [{ lat: la, lng: lo, name: dest.name || 'Destination' }];
+      }
+    }
+    return [];
+  }, [aiPlan, dest]);
+
   if (!dest) {
     return (
       <div className="page page-trip plan-page">
@@ -339,7 +373,7 @@ export default function TripDetails() {
                 {' '}
                 ·{' '}
                 <a href={mapHref} target="_blank" rel="noreferrer" className="plan-map-link">
-                  Open area map
+                  View on map ↗
                 </a>
               </>
             )}
@@ -362,6 +396,22 @@ export default function TripDetails() {
               {mapCaption && <p className="muted small plan-static-map-caption">{mapCaption}</p>}
               <div className="plan-static-map-frame">
                 <img src={staticMapUrl} alt="" className="plan-static-map-img" loading="lazy" />
+              </div>
+            </section>
+          )}
+
+          {interactiveMapWaypoints.length > 0 && (
+            <section className="plan-interactive-map-section" aria-label="Interactive map">
+              <h2 className="plan-static-map-title">Interactive Map</h2>
+              <p className="muted small plan-static-map-caption">
+                Explore {dest.name} with an interactive map. Zoom in to see details and nearby attractions.
+              </p>
+              <div className="plan-interactive-map-container">
+                <MapView
+                  waypoints={interactiveMapWaypoints}
+                  height="450px"
+                  defaultZoom={14}
+                />
               </div>
             </section>
           )}

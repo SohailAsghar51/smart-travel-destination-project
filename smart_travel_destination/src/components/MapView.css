@@ -1,0 +1,6 @@
+/* Leaflet's default .leaflet-div-icon is a white square; we render the pin ourselves */
+.map-view-marker.leaflet-div-icon,
+.leaflet-div-icon.map-view-marker {
+  background: transparent;
+  border: none;
+}

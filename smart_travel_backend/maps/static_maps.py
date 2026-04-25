@@ -29,30 +29,33 @@ def _parse_wh(size: str) -> tuple[int, int]:
 
 
 def _zoom_for_spread(dlat: float, dlon: float) -> int:
-    """Pick zoom level from geographic span in degrees (rough fit for Pakistan-scale to city)."""
+    """
+    Pick zoom level from geographic span in degrees. Higher = closer in (max ~17 for static service).
+    Bias a bit tight so single-city / local pins are not comically wide.
+    """
     span = max(dlat, dlon, 0.0001)
     if span > 8.0:
-        return 5
-    if span > 3.0:
-        return 6
-    if span > 1.0:
         return 7
-    if span > 0.4:
+    if span > 3.0:
         return 8
-    if span > 0.15:
+    if span > 1.0:
         return 9
-    if span > 0.06:
+    if span > 0.4:
         return 10
-    if span > 0.025:
+    if span > 0.15:
         return 11
-    if span > 0.012:
+    if span > 0.06:
         return 12
-    if span > 0.006:
+    if span > 0.025:
         return 13
-    return 14
+    if span > 0.012:
+        return 14
+    if span > 0.006:
+        return 15
+    return 16
 
 
-def destination_hero_image_url(latitude, longitude, size="1200x500", zoom=11):
+def destination_hero_image_url(latitude, longitude, size="1200x500", zoom=13):
     """
     One static map: center on a single coordinate with one pin.
 
@@ -103,14 +106,14 @@ def itinerary_map_image_url(locations, size="1000x480", max_markers=15):
         return None
     w, h = _parse_wh(size)
     if len(pts) == 1:
-        return destination_hero_image_url(pts[0][0], pts[0][1], size=f"{w}x{h}", zoom=12)
+        return destination_hero_image_url(pts[0][0], pts[0][1], size=f"{w}x{h}", zoom=15)
     lats = [p[0] for p in pts]
     lons = [p[1] for p in pts]
     dlat = max(lats) - min(lats)
     dlon = max(lons) - min(lons)
     clat = (min(lats) + max(lats)) / 2.0
     clon = (min(lons) + max(lons)) / 2.0
-    z = _zoom_for_spread(dlat, dlon)
+    z = min(17, _zoom_for_spread(dlat, dlon) + 1)  # nudge one level closer; cap for static service
     q: list = [
         ("center", f"{clat:.6f},{clon:.6f}"),
         ("zoom", str(z)),
